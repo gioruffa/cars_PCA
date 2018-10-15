@@ -1,0 +1,202 @@
+---
+title: "PCA Analysis of the cars dataset"
+author: "Giorgio Ruffa"
+date: "11th November 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<a href="https://github.com/xmooner/cars_PCA"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png" alt="Fork me on GitHub"></a>
+
+## The Dataset
+
+We are going to analyze the dataset `cars-PCA.txt` (provided in this folder) using principal component analysis.
+
+```{r, include=FALSE}
+library(dplyr)
+```
+
+```{r}
+cars_ds = read.table("cars-PCA.txt",
+                     col.names = c("mpg", "cylinders", "disp", "hp", "wt", "acc", "yr", "og", "name"))
+
+str(cars_ds)
+```
+
+
+Every record represents a car, the name of the columns is pretty self-explanatory; maybe except `disp` which is the  [engine displacement](https://en.wikipedia.org/wiki/Engine_displacement), and `og` which is the origin (1 = US, 2 = EU, 3 = JP).
+
+Let's get a rough idea of the variable distribution
+
+```{r}
+summary(cars_ds)
+```
+
+### Data preparation
+
+A little cleanup is needed as there are duplicated car names; this happens because the same model may evolve during the years but keep the same name. For this reason we are going to join the name with the year and abbreviate it, this will help us with visualization later.
+
+```{r}
+rownames(cars_ds) <- paste(abbreviate(cars_ds$name),cars_ds$yr, sep="_")
+head(cars_ds)
+```
+
+We are going to use a dedicated dataset to perform PCA and set the needed factors.
+
+```{r}
+cars.pc = select(cars_ds,  mpg, disp, hp, wt, acc, og, cylinders)
+cars.pc$og = factor(cars.pc$og)
+cars.pc$cylinders = factor(cars.pc$cylinders)
+table(cars.pc$og)
+```
+
+Most of the cars represented here are from US.
+
+## PCA
+
+We need to evaluate if we can perform the PCA analysis on the covariance or correlation matrix.
+
+```{r}
+cov(cars.pc[,1:5])
+```
+The values on the diagonal are very different, which is expected as covariance is affected by change in scale (i.e. weight is measured in kilograms, while mpg in miles per gallon, and so on). Hence correlation will be a better choice. Lets take a look at it:
+```{r}
+cor(cars.pc[,1:5])
+```
+It seems clear that some correlation is present in many of the quantitative variables.
+
+We use the `ggpairs` function from `GGally` package to obtain easily a scatterplot matrix.
+
+```{r include=FALSE}
+library(ggplot2)
+library(GGally)
+```
+```{r}
+ggpairs(cars.pc, columns = c('mpg', 'disp', 'hp', 'wt', 'acc'), lower = list(continuous="points",combo="facetdensity",mapping=aes(color=og)))
+```
+
+It is clearl that for most of the US cars engine displacement is positively correlated with horsepower and weight. I.e. the bigger the engine, the more power, the heavier the car. Instead, mileage is penalized and acceleration does not seem to improve.
+
+Since what PCA does is exploring which linear combination of the variables has the maximum variance, we can expect few eigenvalues to describe the most variance of the dataset.
+
+### Variables
+
+Time to perform the PCA with the `FactoMineR` package, we are going to set the `scale.unit` argument to `TRUE` in order to use the correlation matrix.
+Since PCA is not intended to work on qualitative variables, we are going to use the origin and number of cylinders as supplementary variables.
+
+
+```{r}
+library(FactoMineR)
+cars.pca = PCA(cars.pc, quali.sup = c(6,7), scale.unit = TRUE, graph = FALSE)
+cars.pca$eig
+```
+As expected 94% of the variance is represented with the first two eigenvalues. This will lead to two main principal components, which is a very nice number of dimension for plotting purposes.
+
+Using the `dimdesc` function, we can now see what are the most important contribution to each principal component. For instance, for the first principal component we have:
+
+```{r}
+dimdesc(cars.pca)$Dim.1
+```
+As expected we have that engine displacement, horsepower and weight are strongly positively correlated while miles per gallon is strongly negatively correlated. The basic interpretation is that mpg, disp and hp increase together while mpg decreases. If we want to go further we can say that heavier cars need more power to move and this can be achieved only increasing the size of the engine, at the detriment of fuel efficiency. In fact, as we factor in the categorical variable “cylinders”, notably linked to the engine displacement, we see that the R2 factor is very high with a low p-value, this suggests that the number of cylinders should be clearly visible on PC1 (see below).
+
+```{r}
+dimdesc(cars.pca)$Dim.2
+```
+
+PC2 is less clearly correlated to the variables, but for sure it’s more linked to acceleration than anything else. We can think of it as a rough representation of the performance of the car. The correlations to the qualitative variables are weaker (compared to PC1), in fact we shouldn’t see particular differences along this components for cylinders and origin.
+
+The relationship between each variable and the PCs is even more clear if we plot the so-called circle of correlation. We are going to use the `factoextra` package to do that.
+
+```{r include=FALSE}
+library(factoextra)
+```
+```{r}
+fviz_pca_var(cars.pca, label="var", col.var="contrib")
+```
+
+### Individuals
+
+We would like to see how well each card is represented by the two PCs. A good idea is to look at the cos2 value, which tells us how much in an individual is aligned with at least one of the principal components displayed.
+
+```{r}
+fviz_pca_ind(cars.pca, col.ind="cos2", repel=TRUE, label="none"  ) +
+  scale_color_gradient2(low="white", mid="blue", 
+                        high="red", midpoint=0.50)
+
+```
+
+This PCA plot shows that individuals are generally well aligned with at least one of the PC (cos2 value), implying that they are well represented by this framework. Only some individuals close to the center appears to be more displaced, suggesting that probably PC3 (which by definition is perpendicular to the other two) should cover them, but still they are a minority. We can also see that there is a clear part of the PC1, just on the right of the origin, that has no associated individuals, this may suggest some kind of grouping, maybe linked to the categorical variables.
+
+In order to show if the suppositions we made are founded, we can use the function `ggbiplot` (package `ggbiplot`) to clearly color the individuals in function of the categorical values.
+
+
+Let's start with the cylinders.
+```{r include=FALSE}
+library(ggbiplot)
+```
+```{r}
+ggbiplot(cars.pca, groups=cars.pc$cylinders, ellipse=TRUE) +
+  theme(legend.direction = 'horizontal', legend.position = 'top')+
+  scale_color_discrete(name = 'Cylinders') 
+```
+
+
+
+It is clear that heavier and more powerful cars with bigger engines are mainly at 8 cylinders, and also that lowering the number of cylinders increases the fuel efficiency. The three groups (excluding the only individual with three cylinders) are clearly separated. It also seems that cars with six cylinders appear to have better performance as they are the group with a higher contribution on PC2. 
+
+The other categorical variable is the origin.
+```{r}
+ggbiplot(cars.pca, groups=cars.pc$og, ellipse=TRUE, var.scale = 1) +
+  theme(legend.direction = 'horizontal', legend.position = 'top')+
+  scale_color_discrete(name = 'Origin') 
+```
+
+The vast majority of the heavier and more powerful cars are made by US manufacturers, while all the Japanese and European cars are lighter, less powerful but way more fuel efficient. In particular Japanese cars seem to be less performant than European cars, as they concentrate on the left lower quadrant. We can also see that US manufacturer has introduced some models to cover the sector occupied by European and Japanese cars, probably to appeal to customers more attracted by fuel efficiency than mere horsepowers.
+
+### Clustering
+Out of curiosity we can perform a k-means clustering on all five principal components with 3 clusters and see if there is a relationship with the origin or the number of cylinders.
+
+To include the clustering we need to build a dataframe ourselves and then use `ggplot2` to plot the result
+```{r}
+cars.clust = kmeans(cars.pca$ind$coord,3)
+cars_pca_obs = data.frame(C1=cars.pca$ind$coord[,1],C2=cars.pca$ind$coord[,2], origin = factor(cars_ds$og), cluster=factor(cars.clust$cluster), cylinders=factor(cars_ds$cylinders))
+
+head(cars_pca_obs)
+```
+```{r}
+library(ggplot2)
+```
+The following graph shows the data distribution on the 2 first principal components. The color represents the origin and the shape represents the cluster to which it belongs.
+
+```{r}
+ggplot(cars_pca_obs, aes(x=C1,y=C2))+
+  geom_hline(yintercept=0, color="gray70")+
+  geom_vline(xintercept=0,color="gray70")+
+  geom_point(aes(color=cluster, shape=origin), alpha=0.55, size=4)
+```
+The plot shows how cars are distributed in the three clusters. While the 1st and the 2nd clusters are composed by US cars, in the 3rd one there are cars from EU, Japan and US. Moreover, it can be appreciated that the clusters are well represented in the first principal component (Dim1) but not in the second one, where they are overlapping.
+
+We can make another plot with the colors representing the cylinders and the shape representing the cluster
+```{r}
+ggplot(cars_pca_obs, aes(x=C1,y=C2))+
+  geom_hline(yintercept=0, color="gray70")+
+  geom_vline(xintercept=0,color="gray70")+
+  geom_point(aes(color=cylinders, shape=cluster), alpha=0.55, size=4)
+
+```
+
+By representing the number of cylinders with the color we have realized that the clustering corresponds very closely to the numbers of cylinders: the first cluster contains mainly the vehicles with 6 cylinders, the second one the vehicles with 8 cylinders and the third one the vehicles with 4. There are although some vehicles with 8 cylinders and one with fur cylinders belonging to the first cluster.
+
+## Conclusion
+Principal components may seem like complicated things, but, if well representative, we can associate a name or a concept that they represent. In this case, we can imagine the first component to be the “Americanness” of the car. It is not a mystery that American cars are usually bigger, heavier, with higher displacement and pretty bad mileage compared with European cars, why not particularly excelling performance wise. The second component is linked mainly to acceleration, hence we can call it the “sportiveness” of the car.
+
+## Related
+PCA is a technique used to achieve dimensionality reduction, mainly aimed to visualization in this case. Nevertheless, PCA can prove itself very usefull when applied to highly dimensional datasets.
+
+I strongly suggest the reading of this [amazing article on stackoverflow's blog](https://stackoverflow.blog/2018/02/28/evaluating-options-amazons-hq2-using-stack-overflow-data/) by [Julia Silge](https://stackoverflow.blog/authors/juliasilge/), in which PCA is used to understand which programming languages are used by the same users. 
+The main idea is that each language (or tag) is a dimension of the variables space, so the total number of dimensions is equal to the total number of languages on stackoverflow. In this space a user is represented by the languages associated to his/her profile, so the user vector will be a very sparse vector mainly composed by zeros and with some ones corrisponding to the language used.
+The whole analysis revolves around the contribution of the variables to the principal components, rather than users, which are definitely too many.
+It is particularly interesting to see that for a principal component to be meaningful it does not strictly need to represent a high percentage of variance.
