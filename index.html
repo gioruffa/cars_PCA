@@ -339,6 +339,11 @@ head(cars_pca_obs)</code></pre>
 <h2>Conclusion</h2>
 <p>Principal components may seem like complicated things, but, if well representative, we can associate a name or a concept that they represent. In this case, we can imagine the first component to be the “Americanness” of the car. It is not a mystery that American cars are usually bigger, heavier, with higher displacement and pretty bad mileage compared with European cars, why not particularly excelling performance wise. The second component is linked mainly to acceleration, hence we can call it the “sportiveness” of the car.</p>
 </div>
+<div id="related" class="section level2">
+<h2>Related</h2>
+<p>PCA is a technique used to achieve dimensionality reduction, mainly aimed to visualization in this case. Nevertheless, PCA can prove itself very usefull when applied to highly dimensional datasets.</p>
+<p>I strongly suggest the reading of this <a href="https://stackoverflow.blog/2018/02/28/evaluating-options-amazons-hq2-using-stack-overflow-data/">amazing article on stackoverflow’s blog</a> by <a href="https://stackoverflow.blog/authors/juliasilge/">Julia Silge</a>, in which PCA is used to understand which programming languages are used by the same users. The main idea is that each language (or tag) is a dimension of the variables space, so the total number of dimensions is equal to the total number of languages on stackoverflow. In this space a user is represented by the languages associated to his/her profile, so the user vector will be a very sparse vector mainly composed by zeros and with some ones corrisponding to the language used. The whole analysis revolves around the contribution of the variables to the principal components, rather than users, which are definitely too many. It is particularly interesting to see that for a principal component to be meaningful it does not strictly need to represent a high percentage of variance.</p>
+</div>
 
 
 
