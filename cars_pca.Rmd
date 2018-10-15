@@ -2,7 +2,10 @@
 title: "PCA Analysis of the cars dataset"
 author: "Giorgio Ruffa"
 date: "11th November 2017"
-output: html_document
+output: 
+  html_document:
+    includes:
+      in_header: myheader.html
 ---
 
 ```{r setup, include=FALSE}
