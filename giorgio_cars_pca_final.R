@@ -2,9 +2,9 @@ library(dplyr)
 cars_ds = read.table("cars-PCA.txt",
                      col.names = c("mpg", "cylinders", "disp", "hp", "wt", "acc", "yr", "og", "name"))
 cars_ds
-#we have duplicated cars names and it seems thats because the year is not included in the picture.
-#so what we do is to create another column combining the two of those
-#and abbreviate the name to try to get better graphs later
+# we have duplicated cars names and it seems thats because the year is not included in the picture.
+# so what we do is to create another column combining the two of those
+# and abbreviate the name to try to get better graphs later
 cars_ds[duplicated(cars_ds$name),]$name
 
 rownames(cars_ds) <- paste(abbreviate(cars_ds$name),cars_ds$yr, sep="_")
@@ -78,11 +78,15 @@ cars.clust = kmeans(cars.pca$ind$coord,3)
 cars.clust
 cars.pc$kcluster <- factor(cars.clust$cluster)
 cars.pc
+cars.pc$origin <- factor(cars_ds$og)
 
-cars.pca = PCA(cars.pc, scale.unit = TRUE,quali.sup = c(6,7))
-cars.pca
+cars.pca = PCA(cars.pc, scale.unit = TRUE,quali.sup = c(6,7,8))
+cars.pca$ind$coord[,1]
+cars.pc$origin
+
+
 library(ggplot2)
-cars_pca_obs = data.frame(C1=cars.pca$ind$coord[,1],C2=cars.pca$ind$coord[,2], origin = cars.pc$origin, cluster=cars.pc$kcluster)
+cars_pca_obs = data.frame(C1=cars.pca$ind$coord[,1],C2=cars.pca$ind$coord[,2], origin = factor(cars_ds$og), cluster=cars.pc$kcluster, cylinders=cars.pc$cylinders)
 cars_pca_obs
 
 #some cars on the right are american
@@ -95,6 +99,17 @@ ggplot(cars_pca_obs, aes(x=C1,y=C2, label=rownames(cars_pca_obs)))+
   geom_vline(xintercept=0,color="gray70")+
   geom_point(aes(color=cluster, shape=origin), alpha=0.55, size=4)+
   geom_text(aes(color=cluster),alpha=0.55)
+
+ggplot(cars_pca_obs, aes(x=C1,y=C2))+
+  geom_hline(yintercept=0, color="gray70")+
+  geom_vline(xintercept=0,color="gray70")+
+  geom_point(aes(color=cluster, shape=origin), alpha=0.55, size=4)
+
+ggplot(cars_pca_obs, aes(x=C1,y=C2))+
+  geom_hline(yintercept=0, color="gray70")+
+  geom_vline(xintercept=0,color="gray70")+
+  geom_point(aes(color=cylinders, shape=cluster), alpha=0.55, size=4)
+
 
 #it is a good idea to make biplots with the cluster
 
